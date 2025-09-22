@@ -1,0 +1,16 @@
+{
+  "model_type": "QuantONNX",
+  "npu_mode": "NPU1",
+  "quant": {
+    "input_configs": [
+      {
+        "tensor_name": "DEFAULT",
+        "calibration_dataset": "/path/to/dataset"
+      }
+    ],
+    "calibration_method": "MinMax"
+  },
+  "compiler": {
+    "check": 2
+  }
+}

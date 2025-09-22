@@ -5,13 +5,15 @@
 |--|--|--|
 |yolov5s.pt|0.374|0.572|
 |yolov5s_8w8f_qdq.onnx|0.367|0.567|
+|compiled.axmodel|0.368|0.567|
 
 ## 环境安装
 
 ```
 pip install -r requirements.txt
 ```
-**要求 pytorch==2.6;**
+
+我们发现 `onnxruntime` 和 `onnxscript` 的其他版本可能引起精度误差和导出错误，因此**pytorch==2.6; onnxruntime==1.21.0 onnxscript==0.4.0** 是必须的。
 
 ## 数据集路径修改
 
@@ -61,3 +63,46 @@ Class     Images  Instances          P          R      mAP50   mAP50-95: 100%|�
  Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.625
  Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.722
 ```
+
+## 编译
+
+在 `compile`目录下提供了 `compiled.axmodel.onnx  config.json  val_on_board.py` 三个文件；
+
+编译命令: `pulsar2 build --input yolov5s_8w8f_qdq.onnx --config config.json --output_dir output`
+
+在支持ubuntu的板子上，可以直接上板模型测试 : ``` python val_on_board.py --model compiled.axmodel --dataset ../dataset/coco/  ```
+
+```bash
+Parameters:
+  --model: compiled.axmodel
+  --dataset_path: datasets/coco/
+  --save_results_path: cache/results.json
+  --conf: 0.001
+  --iou: 0.6
+  --num_class: 80
+
+[INFO] Available providers:  ['AxEngineExecutionProvider']
+[INFO] Using provider: AxEngineExecutionProvider
+[INFO] Chip type: ChipType.MC50
+[INFO] VNPU type: VNPUType.DISABLED
+[INFO] Engine version: 2.12.0s
+[INFO] Model type: 0 (single core)
+[INFO] Compiler version: 4.2-dirty 9c83050e-dirty
+sample contains 5000 data
+
+......
+
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.368
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.567
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.397
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.215
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.414
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.483
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.308
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.508
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.558
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.382
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.616
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.712
+```
+
