@@ -34,7 +34,6 @@ data/images/*
 !data/images/zidane.jpg
 !data/images/bus.jpg
 !data/*.sh
-!yolov5s_8w8f_qdq.onnx
 !yolov5s.pt
 results*.csv
 
@@ -65,6 +64,7 @@ VOC/
 *_paddle_model/
 darknet53.conv.74
 yolov3-tiny.conv.15
+!compile/yolov5s_8w8f_qdq.onnx
 
 # GitHub Python GitIgnore ----------------------------------------------------------------------------------------------
 # Byte-compiled / optimized / DLL files

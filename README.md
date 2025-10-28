@@ -73,7 +73,7 @@ Class     Images  Instances          P          R      mAP50   mAP50-95: 100%|�
 
 ## 编译
 
-在 `compile`目录下提供了 `compiled.axmodel.onnx  config.json  val_on_board.py` 三个文件；
+在 `compile`目录下提供了 `compiled.axmodel  config.json  val_on_board.py` 三个文件；
 
 编译命令: `pulsar2 build --input yolov5s_8w8f_qdq.onnx --config config.json --output_dir output`
 
