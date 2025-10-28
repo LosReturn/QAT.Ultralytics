@@ -186,11 +186,12 @@ def train(hyp, opt, device, callbacks):
         - Datasets: https://github.com/ultralytics/yolov5/tree/master/data
         - Tutorial: https://docs.ultralytics.com/yolov5/tutorials/train_custom_data
     """
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = (
+    save_dir, epochs, batch_size, weights, qat_weights,single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = (
         Path(opt.save_dir),
         opt.epochs,
         opt.batch_size,
         opt.weights,
+        opt.qat_weights,
         opt.single_cls,
         opt.evolve,
         opt.data,
@@ -207,8 +208,8 @@ def train(hyp, opt, device, callbacks):
     w = save_dir / "weights"  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / "last.pt", w / "best.pt"
-    best_onnx = w / "best.onnx"
-
+    last_onnx, best_onnx = w / "last.onnx",w / "best.onnx"
+    last_qat_pt, best_qat_pt = w / "last_qat.pt", w / "best_qat.pt"
     # Hyperparameters
     if isinstance(hyp, str):
         with open(hyp, errors="ignore") as f:
@@ -335,7 +336,9 @@ def train(hyp, opt, device, callbacks):
     model = prepared_model
     torch.ao.quantization.allow_exported_model_train_eval(model)
     
-
+    if qat_weights != "" and os.path.exists(qat_weights):
+        LOGGER.info(f"Load qat weights from {qat_weights}")
+        model.load_state_dict(torch.load(qat_weights))
     amp = check_amp(model)  # check AMP
     # Freeze
     freeze = [f"model.{x}." for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
@@ -345,6 +348,7 @@ def train(hyp, opt, device, callbacks):
         if any(x in k for x in freeze):
             LOGGER.info(f"freezing {k}")
             v.requires_grad = False
+
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
@@ -727,30 +731,27 @@ def train(hyp, opt, device, callbacks):
 
                 # Save last, best and delete
                 torch.save(ckpt, last)
+                torch.save(model.state_dict(), last_qat_pt)
+                prepared_model_copy = deepcopy(de_parallel(model))
+                prepared_model_copy.eval()
+                quantized_model = convert_pt2e(prepared_model_copy)
+                onnx_program = torch.onnx.export(quantized_model, (inputs,), dynamo=True)
+                onnx_program.optimize()
+                onnx_program.save(last_onnx)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
-                    model.apply(disable_observer)
-                    prepared_model_copy = deepcopy(de_parallel(model))
-                    prepared_model_copy.eval()
-                    quantized_model = convert_pt2e(prepared_model_copy)
-                    onnx_program = torch.onnx.export(quantized_model, (inputs,), dynamo=True)
-                    onnx_program.optimize()
+                    torch.save(model.state_dict(), best_qat_pt)
                     onnx_program.save(best_onnx)
-                    del prepared_model_copy
-                    del onnx_program
-                    del quantized_model
+                    
                 if opt.save_period > 0 and epoch % opt.save_period == 0:
                     torch.save(ckpt, w / f"epoch{epoch}.pt")
-                    prepared_model_copy = deepcopy(de_parallel(model))
-                    prepared_model_copy.eval()
-                    quantized_model = convert_pt2e(prepared_model_copy)
-                    onnx_program = torch.onnx.export(quantized_model, (inputs,), dynamo=True)
-                    onnx_program.optimize()
+                    torch.save(model.state_dict(), w / f"epoch{epoch}_qat.pt")
                     onnx_program.save(w / f"epoch{epoch}.onnx")
-                    del prepared_model_copy
-                    del onnx_program
-                    del quantized_model
+
                 del ckpt
+                del prepared_model_copy
+                del onnx_program
+                del quantized_model
                 callbacks.run("on_model_save", last, epoch, final_epoch, best_fitness, fi)
 
         # EarlyStopping
@@ -830,6 +831,7 @@ def parse_opt(known=False):
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--weights", type=str, default=ROOT / "yolov5s.pt", help="initial weights path")
+    parser.add_argument("--qat-weights", type=str,  default="", help="initial qat weights path")
     parser.add_argument("--cfg", type=str, default="", help="model.yaml path")
     parser.add_argument("--data", type=str, default=ROOT / "data/coco128.yaml", help="dataset.yaml path")
     parser.add_argument("--hyp", type=str, default=ROOT / "data/hyps/hyp.scratch-low.yaml", help="hyperparameters path")
@@ -867,7 +869,7 @@ def parse_opt(known=False):
     parser.add_argument("--save-period", type=int, default=-1, help="Save checkpoint every x epochs (disabled if < 1)")
     parser.add_argument("--seed", type=int, default=0, help="Global training seed")
     parser.add_argument("--local_rank", type=int, default=-1, help="Automatic DDP Multi-GPU argument, do not modify")
-
+    
     # Logger arguments
     parser.add_argument("--entity", default=None, help="Entity")
     parser.add_argument("--upload_dataset", nargs="?", const=True, default=False, help='Upload data, "val" option')
