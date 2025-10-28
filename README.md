@@ -22,6 +22,13 @@ pip install -r requirements.txt
 ## 训练
 ```python qat_base_ptq.py --data coco.yaml --epochs 50 --weights yolov5s.pt --cfg yolov5s.yaml  --batch-size 96 --device 3 --lsq --hyp hyp.no-augmentation.yaml --save-period 10```
 
+## 多卡训练
+```python -m torch.distributed.run --nproc_per_node 2 --master_port 12345 train_qat_gpus.py --data coco.yaml --epochs 50 --weights yolov5s.pt --cfg yolov5s.yaml --batch-size 96 --device 0,1 --lsq --hyp hyp.no-augmentation.yaml ```
+
+or 
+
+```CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2  --nnodes=1 --node_rank=0 --master_port=12345 train_qat_gpus.py --data coco.yaml --epochs 50 --weights yolov5s.pt --cfg yolov5s.yaml --batch-size 96 --device 0,1 --lsq --hyp hyp.no-augmentation.yaml```
+
 ## 测试
 qdq 模型测试: ```python val.py --weights yolov5s_8w8f_qdq.onnx --data coco.yaml --training-onnx```
 
